@@ -14,14 +14,8 @@
 #include <pthread.h>
 #include <stdint.h>
 
-// Android log function wrappers
-static const char* kTAG = "ServerIPC";
-#define LOGI(...) \
-  ((void)__android_log_print(ANDROID_LOG_INFO, kTAG, __VA_ARGS__))
-#define LOGW(...) \
-  ((void)__android_log_print(ANDROID_LOG_WARN, kTAG, __VA_ARGS__))
-#define LOGE(...) \
-  ((void)__android_log_print(ANDROID_LOG_ERROR, kTAG, __VA_ARGS__))
+#define ANDROID_LOG_TAG "ServerIPC"
+#include "Mine/AndroidLog.h"
 
 const uint32_t color_wheel[4] = {
 	0x000000FF, // red

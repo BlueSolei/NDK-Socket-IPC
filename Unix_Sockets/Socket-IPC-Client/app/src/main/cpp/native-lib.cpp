@@ -1,5 +1,3 @@
-#include "display.h"
-
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,64 +6,19 @@
 #include <sys/un.h>
 #include <unistd.h>
 
-// Can be anything if using abstract namespace
-#define SOCKET_NAME "serverSocket"
-#define BUFFER_SIZE 16
+#include <memory>
+#include "display.h"
+#include "Mine/UnixDomainSocket.h"
 
-static int data_socket;
-static struct sockaddr_un server_addr;
-
-void setupClient(void) {
-	char socket_name[108]; // 108 sun_path length max
-
-	data_socket = socket(AF_UNIX, SOCK_STREAM, 0);
-	if (data_socket < 0) {
-		LOGE("socket: %s", strerror(errno));
-		exit(EXIT_FAILURE);
-	}
-
-	// NDK needs abstract namespace by leading with '\0'
-	// Ya I was like WTF! too... http://www.toptip.ca/2013/01/unix-domain-socket-with-abstract-socket.html?m=1
-	// Note you don't need to unlink() the socket then
-	memcpy(&socket_name[0], "\0", 1);
-	strcpy(&socket_name[1], SOCKET_NAME);
-
-	// clear for safty
-	memset(&server_addr, 0, sizeof(struct sockaddr_un));
-	server_addr.sun_family = AF_UNIX; // Unix Domain instead of AF_INET IP domain
-	strncpy(server_addr.sun_path, socket_name, sizeof(server_addr.sun_path) - 1); // 108 char max
-
-	// Assuming only one init connection for demo
-	int ret = connect(data_socket, (const struct sockaddr *) &server_addr, sizeof(struct sockaddr_un));
-	if (ret < 0) {
-		LOGE("connect: %s", strerror(errno));
-		exit(EXIT_FAILURE);
-	}
-
-	LOGI("Client Setup Complete");
-}
+static IPCUPtr ipc;
 
 void sendColor(uint8_t color) {
-	int ret;
-	uint8_t buffer[BUFFER_SIZE];
-
-	LOGI("Color: %d", color);
-	memcpy(buffer, &color, sizeof(uint8_t));
-	LOGI("Buffer: %d", buffer[0]);
-
-	ret = write(data_socket, buffer, BUFFER_SIZE);
-	if (ret < 0) {
-		LOGE("write: %s", strerror(errno));
-		exit(EXIT_FAILURE);
-	}
-
-	ret = read(data_socket, buffer, BUFFER_SIZE);
-	if (ret < 0) {
-		LOGE("read: %s", strerror(errno));
-		exit(EXIT_FAILURE);
-	}
-
-	LOGI("Return: %s", (char*)buffer);
+	LOGI("** Start send color: %d", color);
+  ipc->Send(color, [](std::string_view data)
+  {
+    LOGI("** Return: %s", (char*)data.data());
+  });
+  LOGI("** End send color: %d", color);
 }
 
 // Handles input touches to the screen
@@ -107,7 +60,7 @@ void android_main(struct android_app* app) {
 	int events;
 	android_poll_source* source;
 
-	setupClient();
+	ipc.reset(new IPC(IPC::Client{}));
 
 	// Main loop
 	do {
@@ -117,6 +70,5 @@ void android_main(struct android_app* app) {
 		}
 	} while (app->destroyRequested == 0);
 
-	close(data_socket);
 	LOGI( "GAME OVER");
 }
